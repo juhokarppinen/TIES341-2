@@ -3,7 +3,7 @@
 
     By Juho Karppinen 2017
 
-    A simple physics simulation.
+    A simple game of avoidance.
 
 
     Non-base dependencies:
@@ -21,9 +21,8 @@ import Graphics.Gloss.Interface.IO.Game
 -- of the keyboard.
 data World = World
     {
-        loc :: Point,
-        vel :: Vector,
-        key :: KeyboardState
+        ball :: Ball,
+        keys :: KeyboardState
     } deriving Show
 
 
@@ -34,6 +33,24 @@ data KeyboardState = Keys
         down :: Bool,
         left :: Bool,
         right :: Bool 
+    } deriving Show
+
+
+-- The data type which contains the state of the ball.
+data Ball = Ball 
+    {
+        locB :: Point,
+        velB :: Vector,
+        radB :: Float
+    } deriving Show
+
+
+-- The data type which contains the state of a single obstacle.
+data Obstacle = Obstacle
+    {
+        locO :: Point,
+        velO :: Vector,
+        radO :: Float
     } deriving Show
 
 
@@ -49,6 +66,9 @@ leftKey = Keys False False True False
 
 rightKey :: KeyboardState
 rightKey = Keys False False False True
+
+noKey :: KeyboardState
+noKey = Keys False False False False
 
 
 -- The amount of gravity imparted to the ball.
@@ -78,36 +98,42 @@ ballPic = circleSolid ballSize
 
 -- The initial state of the world.
 initialState :: World
-initialState = World (0,0) (0,0) (Keys False False False False)
+initialState = World (Ball (0,0) (0,0) ballSize) noKey
 
 
 -- Translate the ball according to its location.
 render :: World -> Picture
-render w = uncurry translate (loc w) $ ballPic
+render w = uncurry translate (locB . ball $ w) $ ballPic
 
 
 -- Update the keyboard state according to keyboard input. Continuous keypresses
 -- are recognized by handling both down and up events.
 handleInput :: Event -> World -> World
-handleInput event world = World (loc world) (vel world) keys where
-    keys = case event of
+handleInput event world = 
+    World 
+        (Ball 
+            (locB . ball $ world) 
+            (velB . ball $ world) 
+            ballSize) 
+        keystate where
+    keystate = case event of
         EventKey (SpecialKey KeyUp) Down _ _ ->
-            orKeys (key world) upKey
+            orKeys (keys world) upKey
         EventKey (SpecialKey KeyDown) Down _ _ ->
-            orKeys (key world) downKey
+            orKeys (keys world) downKey
         EventKey (SpecialKey KeyLeft) Down _ _ ->
-            orKeys (key world) leftKey
+            orKeys (keys world) leftKey
         EventKey (SpecialKey KeyRight) Down _ _ ->
-            orKeys (key world) rightKey
+            orKeys (keys world) rightKey
         EventKey (SpecialKey KeyUp) Up _ _ ->
-            andKeys (key world) $ negateKey upKey
+            andKeys (keys world) $ negateKey upKey
         EventKey (SpecialKey KeyDown) Up _ _ ->
-            andKeys (key world) $ negateKey downKey
+            andKeys (keys world) $ negateKey downKey
         EventKey (SpecialKey KeyLeft) Up _ _ ->
-            andKeys (key world) $ negateKey leftKey
+            andKeys (keys world) $ negateKey leftKey
         EventKey (SpecialKey KeyRight) Up _ _ ->
-            andKeys (key world) $ negateKey rightKey
-        otherwise -> key world
+            andKeys (keys world) $ negateKey rightKey
+        otherwise -> keys world
 
 
 -- Perform an AND operation on two KeyboardStates.
@@ -133,23 +159,24 @@ moveBall seconds world =
     let
         -- Clamp the ball's x and y coordinates within the boundaries of the
         -- the window.
+        location = locB . ball $ world
         x
-            | fst (loc world) <= leftBoundary = leftBoundary
-            | fst (loc world) >= rightBoundary = rightBoundary
-            | otherwise = fst (loc world)  
+            | fst location <= leftBoundary = leftBoundary
+            | fst location >= rightBoundary = rightBoundary
+            | otherwise = fst location  
         y 
-            | snd (loc world) <= bottomBoundary = bottomBoundary
-            | snd (loc world) >= topBoundary = topBoundary
-            | otherwise = snd (loc world)
+            | snd location <= bottomBoundary = bottomBoundary
+            | snd location >= topBoundary = topBoundary
+            | otherwise = snd location
 
         -- Calculate the strength and direction of the new velocity.
-        v = ((vel world) .+ gravity .+ impulse) .* damping where
+        v = ((velB . ball $ world) .+ gravity .+ impulse) .* damping where
             impulse = (horizontal, vertical) where
-                horizontal = case key world of
+                horizontal = case keys world of
                     Keys _ _ True False -> -effect
                     Keys _ _ False True -> effect
                     otherwise -> 0
-                vertical = case key world of
+                vertical = case keys world of
                     Keys True False _ _ -> effect
                     Keys False True _ _ -> -effect
                     otherwise -> 0
@@ -164,7 +191,7 @@ moveBall seconds world =
         -- its new velocity.    
         newLoc = (x, y) .+ newVel
 
-    in World newLoc newVel (key world)
+    in World (Ball newLoc newVel ballSize) (keys world)
 
 
 -- Calculate the sum of two vectors.
