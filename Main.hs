@@ -26,10 +26,10 @@ data KeyboardState = Keys
 
 -- The amount of gravity imparted to the ball.
 gravity :: Vector
-gravity = (0, -0.5)
+gravity = (0, 0)
 
 
--- The amount of movement damping.
+-- The amount of movement damping. 1 = no damping. 0 = Full damping.
 damping :: Float
 damping = 0.95
 
@@ -95,30 +95,32 @@ orKeys (Keys a1 a2 a3 a4) (Keys b1 b2 b3 b4) =
 -- Update the ball's velocity based on keyboard input.
 -- Update the ball's location based on it's velocity.
 moveBall :: Float -> World -> World
-moveBall seconds world = World (loc world .+ newVel) newVel (key world) where 
-    newVel
-        | x <= leftBoundary || x >= rightBoundary = negX v
-        | y <= bottomBoundary || y >= topBoundary = negY v
-        | otherwise = v
-        where
-            x
-                | fst (loc world) <= leftBoundary = leftBoundary
-                | fst (loc world) >= rightBoundary = rightBoundary
-                | otherwise = fst (loc world)  
-            y 
-                | snd (loc world) <= bottomBoundary = bottomBoundary
-                | snd (loc world) >= topBoundary = topBoundary
-                | otherwise = snd (loc world)
-            v = ((vel world) .+ gravity .+ impulse) .* damping where
-                impulse = (horizontal, vertical) where
-                    horizontal = case key world of
-                        Keys _ _ True False -> -effect
-                        Keys _ _ False True -> effect
-                        otherwise -> 0
-                    vertical = case key world of
-                        Keys True False _ _ -> effect
-                        Keys False True _ _ -> -effect
-                        otherwise -> 0
+moveBall seconds world = 
+    let
+        x
+            | fst (loc world) <= leftBoundary = leftBoundary
+            | fst (loc world) >= rightBoundary = rightBoundary
+            | otherwise = fst (loc world)  
+        y 
+            | snd (loc world) <= bottomBoundary = bottomBoundary
+            | snd (loc world) >= topBoundary = topBoundary
+            | otherwise = snd (loc world)
+        v = ((vel world) .+ gravity .+ impulse) .* damping where
+            impulse = (horizontal, vertical) where
+                horizontal = case key world of
+                    Keys _ _ True False -> -effect
+                    Keys _ _ False True -> effect
+                    otherwise -> 0
+                vertical = case key world of
+                    Keys True False _ _ -> effect
+                    Keys False True _ _ -> -effect
+                    otherwise -> 0
+        newVel
+            | x <= leftBoundary || x >= rightBoundary = negX v
+            | y <= bottomBoundary || y >= topBoundary = negY v
+            | otherwise = v
+        newLoc = (x, y) .+ newVel
+    in World newLoc newVel (key world)
 
 
 -- Operators for vector math.
