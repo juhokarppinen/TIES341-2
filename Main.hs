@@ -107,7 +107,7 @@ render w = uncurry translate (locB . ball $ w) $ ballPic
 
 
 -- Update the keyboard state according to keyboard input. Continuous keypresses
--- are recognized by handling both down and up events.
+-- are recognized by handling down and up events separately.
 handleInput :: Event -> World -> World
 handleInput event world = 
     World 
