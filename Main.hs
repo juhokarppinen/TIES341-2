@@ -22,6 +22,7 @@ import Graphics.Gloss.Interface.IO.Game
 data World = World
     {
         ball :: Ball,
+        obst :: Obstacle,
         keys :: KeyboardState
     } deriving Show
 
@@ -49,8 +50,7 @@ data Ball = Ball
 data Obstacle = Obstacle
     {
         locO :: Point,
-        velO :: Vector,
-        radO :: Float
+        velO :: Vector
     } deriving Show
 
 
@@ -76,9 +76,9 @@ gravity :: Vector
 gravity = (0, 0)
 
 
--- The amount of movement damping. 1 = no damping. 0 = Full damping.
-damping :: Float
-damping = 0.95
+-- The amount of movement retention. 1 = full retention. 0 = no retention.
+retention :: Float
+retention = 0.95
 
 
 -- The amount of velocity addition imparted by keyboard movement.
@@ -98,12 +98,19 @@ ballPic = circleSolid ballSize
 
 -- The initial state of the world.
 initialState :: World
-initialState = World (Ball (0,0) (0,0) ballSize) noKey
+initialState = World 
+    (Ball (0,0) (0,0) ballSize) 
+    (Obstacle (0,0) (0,-1))
+    noKey
 
 
--- Translate the ball according to its location.
+-- Render the world.
 render :: World -> Picture
-render w = uncurry translate (locB . ball $ w) $ ballPic
+render world = pictures 
+    [
+        uncurry translate (locB $ ball world) $ ballPic,
+        uncurry translate (locO $ obst world) $ rectangleSolid 100 (2 * ballSize)
+    ]
 
 
 -- Update the keyboard state according to keyboard input. Continuous keypresses
@@ -115,6 +122,7 @@ handleInput event world =
             (locB . ball $ world) 
             (velB . ball $ world) 
             ballSize) 
+        (obst world)
         keystate where
     keystate = case event of
         EventKey (SpecialKey KeyUp) Down _ _ ->
@@ -153,24 +161,24 @@ negateKey :: KeyboardState -> KeyboardState
 negateKey (Keys a b c d) = Keys (not a) (not b) (not c) (not d)
 
 
--- Handle ball movement.
-moveBall :: Float -> World -> World
-moveBall seconds world = 
+-- Handle object movement.
+updateWorld :: Float -> World -> World
+updateWorld seconds world = 
     let
         -- Clamp the ball's x and y coordinates within the boundaries of the
         -- the window.
-        location = locB . ball $ world
-        x
-            | fst location <= leftBoundary = leftBoundary
-            | fst location >= rightBoundary = rightBoundary
-            | otherwise = fst location  
-        y 
-            | snd location <= bottomBoundary = bottomBoundary
-            | snd location >= topBoundary = topBoundary
-            | otherwise = snd location
+        locationB = locB $ ball world
+        xB
+            | fst locationB <= leftBoundary = leftBoundary
+            | fst locationB >= rightBoundary = rightBoundary
+            | otherwise = fst locationB  
+        yB 
+            | snd locationB <= bottomBoundary = bottomBoundary
+            | snd locationB >= topBoundary = topBoundary
+            | otherwise = snd locationB
 
         -- Calculate the strength and direction of the new velocity.
-        v = ((velB . ball $ world) .+ gravity .+ impulse) .* damping where
+        vB = ((velB $ ball world) .+ gravity .+ impulse) .* retention where
             impulse = (horizontal, vertical) where
                 horizontal = case keys world of
                     Keys _ _ True False -> -effect
@@ -182,16 +190,26 @@ moveBall seconds world =
                     otherwise -> 0
 
         -- Make the ball bounce off walls by negating a velocity component.
-        newVel
-            | x <= leftBoundary || x >= rightBoundary = negX v
-            | y <= bottomBoundary || y >= topBoundary = negY v
-            | otherwise = v
+        newVelB
+            | xB <= leftBoundary || xB >= rightBoundary = negX vB
+            | yB <= bottomBoundary || yB >= topBoundary = negY vB
+            | otherwise = vB
 
         -- Set the ball's new location based on its previous location and
         -- its new velocity.    
-        newLoc = (x, y) .+ newVel
+        newLocB = (xB, yB) .+ newVelB
 
-    in World (Ball newLoc newVel ballSize) (keys world)
+
+        vO = velO $ obst world
+
+        -- Set the obstacles location based on its previous loation and
+        -- its velocity.
+        newLocO = (locO $ obst world) .+ vO
+
+    in World 
+        (Ball newLocB newVelB ballSize) 
+        (Obstacle newLocO vO)
+        (keys world)
 
 
 -- Calculate the sum of two vectors.
@@ -225,10 +243,10 @@ windowLocation = (10,10)
 
 
 -- The boundaries of ball movement.
-leftBoundary = -0.5 * fromIntegral (fst windowSize) + 0.75 * ballSize
-rightBoundary = 0.5 * fromIntegral (fst windowSize) - 0.75 * ballSize
-topBoundary = 0.5 * fromIntegral (snd windowSize) - 0.75 * ballSize
-bottomBoundary = -0.5 * fromIntegral (snd windowSize) + 0.75 * ballSize
+leftBoundary = -0.5 * fromIntegral (fst windowSize) + ballSize
+rightBoundary = 0.5 * fromIntegral (fst windowSize) - ballSize
+topBoundary = 0.5 * fromIntegral (snd windowSize) - ballSize
+bottomBoundary = -0.5 * fromIntegral (snd windowSize) + ballSize
 
 
 -- The entry point of the program.
@@ -240,4 +258,4 @@ main = play
     initialState
     render
     handleInput
-    moveBall
+    updateWorld
