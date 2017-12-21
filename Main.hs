@@ -1,6 +1,18 @@
+{-
+    Ball Bouncer
+
+    By Juho Karppinen 2017
+
+    A simple physics simulation.
+
+
+    Non-base dependencies:
+
+    Graphics.Gloss
+-}
+
 module Main where
 
-import Data.Monoid
 import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Game
 
@@ -74,7 +86,8 @@ render :: World -> Picture
 render w = uncurry translate (loc w) $ ballPic
 
 
--- Update the keyboard state according to keyboard input.
+-- Update the keyboard state according to keyboard input. Continuous keypresses
+-- are recognized by handling both down and up events.
 handleInput :: Event -> World -> World
 handleInput event world = World (loc world) (vel world) keys where
     keys = case event of
@@ -97,19 +110,19 @@ handleInput event world = World (loc world) (vel world) keys where
         otherwise -> key world
 
 
--- Perform the AND operation on two KeyboardStates.
+-- Perform an AND operation on two KeyboardStates.
 andKeys :: KeyboardState -> KeyboardState -> KeyboardState
 andKeys (Keys a1 a2 a3 a4) (Keys b1 b2 b3 b4) =
     Keys (a1 && b1) (a2 && b2) (a3 && b3) (a4 && b4)
 
 
--- Perform the OR operation on two KeyboardStates.
+-- Perform an OR operation on two KeyboardStates.
 orKeys :: KeyboardState -> KeyboardState -> KeyboardState
 orKeys (Keys a1 a2 a3 a4) (Keys b1 b2 b3 b4) =
     Keys (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4)
 
 
--- Perform the NOT operation on a KeyboardState.
+-- Perform a NOT operation on a KeyboardState.
 negateKey :: KeyboardState -> KeyboardState
 negateKey (Keys a b c d) = Keys (not a) (not b) (not c) (not d)
 
