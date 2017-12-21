@@ -17,10 +17,10 @@ data World = World
 
 data KeyboardState = Keys 
     {
-        upKey :: Bool,
-        downKey :: Bool,
-        leftKey :: Bool,
-        rightKey :: Bool 
+        up :: Bool,
+        down :: Bool,
+        left :: Bool,
+        right :: Bool 
     } deriving Show
 
 
@@ -57,26 +57,38 @@ render :: World -> Picture
 render w = uncurry translate (loc w) $ ballPic
 
 
+upKey :: KeyboardState
+upKey = Keys True False False False
+
+downKey :: KeyboardState
+downKey = Keys False True False False
+
+leftKey :: KeyboardState
+leftKey = Keys False False True False
+
+rightKey :: KeyboardState
+rightKey = Keys False False False True
+
 -- Update the keyboard state according to keyboard input.
 handleInput :: Event -> World -> World
 handleInput event world = World (loc world) (vel world) keys where
     keys = case event of
         EventKey (SpecialKey KeyUp) Down _ _ ->
-            orKeys (key world) (Keys True False False False)
+            orKeys (key world) upKey
         EventKey (SpecialKey KeyDown) Down _ _ ->
-            orKeys (key world) (Keys False True False False)
+            orKeys (key world) downKey
         EventKey (SpecialKey KeyLeft) Down _ _ ->
-            orKeys (key world) (Keys False False True False)
+            orKeys (key world) leftKey
         EventKey (SpecialKey KeyRight) Down _ _ ->
-            orKeys (key world) (Keys False False False True)
+            orKeys (key world) rightKey
         EventKey (SpecialKey KeyUp) Up _ _ ->
-            andKeys (key world) (Keys False True True True)
+            andKeys (key world) $ negateKey upKey
         EventKey (SpecialKey KeyDown) Up _ _ ->
-            andKeys (key world) (Keys True False True True)
+            andKeys (key world) $ negateKey downKey
         EventKey (SpecialKey KeyLeft) Up _ _ ->
-            andKeys (key world) (Keys True True False True)
+            andKeys (key world) $ negateKey leftKey
         EventKey (SpecialKey KeyRight) Up _ _ ->
-            andKeys (key world) (Keys True True True False)
+            andKeys (key world) $ negateKey rightKey
         otherwise -> key world
 
 
@@ -90,6 +102,10 @@ andKeys (Keys a1 a2 a3 a4) (Keys b1 b2 b3 b4) =
 orKeys :: KeyboardState -> KeyboardState -> KeyboardState
 orKeys (Keys a1 a2 a3 a4) (Keys b1 b2 b3 b4) =
     Keys (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4)
+
+
+negateKey :: KeyboardState -> KeyboardState
+negateKey (Keys a b c d) = Keys (not a) (not b) (not c) (not d)
 
 
 moveBall :: Float -> World -> World
