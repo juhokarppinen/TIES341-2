@@ -92,11 +92,11 @@ orKeys (Keys a1 a2 a3 a4) (Keys b1 b2 b3 b4) =
     Keys (a1 || b1) (a2 || b2) (a3 || b3) (a4 || b4)
 
 
--- Update the ball's velocity based on keyboard input.
--- Update the ball's location based on it's velocity.
 moveBall :: Float -> World -> World
 moveBall seconds world = 
     let
+        -- Clamp the ball's x and y coordinates within the boundaries of the
+        -- the window.
         x
             | fst (loc world) <= leftBoundary = leftBoundary
             | fst (loc world) >= rightBoundary = rightBoundary
@@ -105,6 +105,8 @@ moveBall seconds world =
             | snd (loc world) <= bottomBoundary = bottomBoundary
             | snd (loc world) >= topBoundary = topBoundary
             | otherwise = snd (loc world)
+
+        -- Calculate the strength and direction of the new velocity.
         v = ((vel world) .+ gravity .+ impulse) .* damping where
             impulse = (horizontal, vertical) where
                 horizontal = case key world of
@@ -115,25 +117,36 @@ moveBall seconds world =
                     Keys True False _ _ -> effect
                     Keys False True _ _ -> -effect
                     otherwise -> 0
+
+        -- Make the ball bounce off walls by negating a velocity component.
         newVel
             | x <= leftBoundary || x >= rightBoundary = negX v
             | y <= bottomBoundary || y >= topBoundary = negY v
             | otherwise = v
+
+        -- Set the ball's new location based on its previous location and
+        -- its new velocity.    
         newLoc = (x, y) .+ newVel
+
     in World newLoc newVel (key world)
 
 
--- Operators for vector math.
-
+-- Sum of two vectors.
 (.+) :: Vector -> Vector -> Vector
 (ax, ay) .+ (bx, by) = (ax + bx, ay + by)
 
+
+-- Scale a vector.
 (.*) :: Vector -> Float -> Vector
 (x, y) .* s = (x * s, y * s)
 
+
+-- Negate the x component of a vector.
 negX :: Vector -> Vector
 negX (x,y) = (-x,y)
 
+
+-- Negate the y component of a vector.
 negY :: Vector -> Vector
 negY (x,y) = (x,-y)
 
