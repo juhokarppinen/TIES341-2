@@ -100,17 +100,50 @@ ballPic = circleSolid ballSize
 initialState :: World
 initialState = World 
     (Ball (0,0) (0,0) ballSize) 
-    (Obstacle (0,0) (0,-1))
+    (Obstacle (0,320) (0,-1))
     noKey
 
 
 -- Render the world.
 render :: World -> Picture
-render world = pictures 
-    [
-        uncurry translate (locB $ ball world) $ ballPic,
-        uncurry translate (locO $ obst world) $ rectangleSolid 100 (2 * ballSize)
-    ]
+render world = if not (collision world) then
+    let
+        holeSize = 2 * ballSize
+        obstWidth = fromIntegral windowWidth
+        obstHeight = holeSize
+        obstLeft = (locO $ obst world) .+ (-obstWidth / 2 - holeSize, 0)
+        obstRight = (locO $ obst world) .+ (obstWidth / 2 + holeSize, 0)
+        obstPict = rectangleSolid obstWidth obstHeight
+        ballLoc = locB $ ball world
+    in
+        pictures
+            [
+                uncurry translate ballLoc ballPic,
+                uncurry translate obstLeft obstPict,
+                uncurry translate obstRight obstPict
+            ]
+    else ballPic
+
+
+-- Check whether the ball collides with an obstacle.
+collision :: World -> Bool
+collision world =
+    let
+        holeSize = 2 * ballSize
+        locationBall = locB $ ball world
+        locationObst = locO $ obst world
+        xB = fst locationBall
+        yB = snd locationBall
+        xO = fst locationObst
+        yO = snd locationObst
+        holeLeft = fst locationObst - holeSize
+        holeRight = fst locationObst + holeSize
+        ballIsAtObstHeight =
+            yB - ballSize <= yO + ballSize || yB + ballSize >= yO - ballSize 
+        ballIsAtHole = 
+            xB - ballSize >= holeLeft && xB + ballSize <= holeRight
+    in
+        ballIsAtObstHeight && not ballIsAtHole
 
 
 -- Update the keyboard state according to keyboard input. Continuous keypresses
@@ -235,8 +268,14 @@ negY (x,y) = (x,-y)
 windowTitle :: String
 windowTitle = "Bouncing Ball"
 
+windowWidth :: Int
+windowWidth = 640
+
+windowHeight :: Int
+windowHeight = 640
+
 windowSize :: (Int,Int)
-windowSize = (640, 640)
+windowSize = (windowWidth, windowHeight)
 
 windowLocation :: (Int,Int)
 windowLocation = (10,10)
