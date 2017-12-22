@@ -4,7 +4,7 @@
     By Juho Karppinen 2017
 
     A simple game of avoidance. Use arrow keys to move the ball around. Try
-    to avoid the falling wall. Hit ESC to quit.
+    to avoid the falling wall. Restart game with Space. Hit ESC to quit.
 
 
     Non-base dependencies:
@@ -22,8 +22,8 @@ import Graphics.Gloss.Interface.IO.Game
 -- keyboard.
 data World = World
     {
-        ball :: Ball,
-        obst :: Obstacle,
+        ball :: Mover,
+        obst :: Mover,
         keys :: KeyboardState
     } deriving Show
 
@@ -38,19 +38,11 @@ data KeyboardState = Keys
     } deriving Show
 
 
--- The data type which contains the state of the ball.
-data Ball = Ball 
+-- The data type which contains the state of a moving object.
+data Mover = Mover 
     {
-        locB :: Point,
-        velB :: Vector
-    } deriving Show
-
-
--- The data type which contains the state of a single obstacle.
-data Obstacle = Obstacle
-    {
-        locO :: Point,
-        velO :: Vector
+        loc :: Point,
+        vel :: Vector
     } deriving Show
 
 
@@ -81,16 +73,16 @@ effect :: Float
 effect = 1
 
 
--- The size of the ball.
-ballSize :: Float
-ballSize = 25
+-- The radius of the ball.
+ballRadius :: Float
+ballRadius = 25
 
 
 -- The initial state of the world.
 initialState :: World
 initialState = World 
-    (Ball (0,0) (0,0)) 
-    (Obstacle (0,topBoundary + ballSize) (0,-1))
+    (Mover (0,0) (0,0)) 
+    (Mover (0,topBoundary + ballRadius) (0,-1))
     noKey
 
 
@@ -98,23 +90,30 @@ initialState = World
 render :: World -> Picture
 render world =
     let
-        holeSize = 2 * ballSize
         obstWidth = fromIntegral windowWidth
-        obstHeight = holeSize
-        obstLeft = (locO $ obst world) .+ (-obstWidth / 2 - holeSize, 0)
-        obstRight = (locO $ obst world) .+ (obstWidth / 2 + holeSize, 0)
+        obstHeight = 2 * ballRadius
+        obstLeft = (loc $ obst world) .+ (-obstWidth / 2 - 2 * ballRadius, 0)
+        obstRight = (loc $ obst world) .+ (obstWidth / 2 + 2 * ballRadius, 0)
         obstPict = rectangleSolid obstWidth obstHeight
-        ballLoc = locB $ ball world
+        ballLoc = loc $ ball world
     in
         pictures
             [
                 uncurry translate obstLeft obstPict,
                 uncurry translate obstRight obstPict,
-                uncurry translate ballLoc ballPic
+                uncurry translate ballLoc ballPic,
+                restartText
             ] where
             ballPic
-                | collision world = color red (circleSolid ballSize)
-                | otherwise = circleSolid ballSize
+                | collision world = color red (circleSolid ballRadius)
+                | otherwise = circleSolid ballRadius
+            restartText
+                | collision world = 
+                    translate (-160) 0 $
+                    scale 0.25 0.25 $ 
+                    color green $ 
+                    text "Press Space to restart"
+                | otherwise = blank
 
 
 -- Check whether the ball collides with an obstacle. Current implementation
@@ -123,20 +122,20 @@ render world =
 collision :: World -> Bool
 collision world =
     let
-        locationBall = locB $ ball world
-        locationObst = locO $ obst world
+        locationBall = loc $ ball world
+        locationObst = loc $ obst world
         xB = fst locationBall
         yB = snd locationBall
         xO = fst locationObst
         yO = snd locationObst
-        holeLeft = xO - 2 * ballSize
-        holeRight = xO + 2 * ballSize
-        obstTop = yO + ballSize
-        obstBottom = yO - ballSize
-        ballTop = yB + ballSize
-        ballBottom = yB - ballSize
-        ballLeft = xB - ballSize
-        ballRight = xB + ballSize
+        holeLeft = xO - 2 * ballRadius
+        holeRight = xO + 2 * ballRadius
+        obstTop = yO + ballRadius
+        obstBottom = yO - ballRadius
+        ballTop = yB + ballRadius
+        ballBottom = yB - ballRadius
+        ballLeft = xB - ballRadius
+        ballRight = xB + ballRadius
         ballIsAtObstHeight =
             ballTop >= obstBottom && ballBottom <= obstTop
         ballIsAtHole = 
@@ -148,11 +147,13 @@ collision world =
 -- Update the keyboard state according to keyboard input. Continuous keypresses
 -- are recognized by handling down and up events separately.
 handleInput :: Event -> World -> World
+handleInput (EventKey (SpecialKey KeySpace) Down _ _) world =
+    if collision world then initialState else world
 handleInput event world = 
     World 
-        (Ball 
-            (locB . ball $ world) 
-            (velB . ball $ world))
+        (Mover 
+            (loc . ball $ world) 
+            (vel . ball $ world))
         (obst world)
         keystate where
     keystate = case event of
@@ -192,13 +193,13 @@ negateKey :: KeyboardState -> KeyboardState
 negateKey (Keys a b c d) = Keys (not a) (not b) (not c) (not d)
 
 
--- Handle object movement. Collision stops updating the game.
+-- Handle object movement. Collision stops the game.
 updateWorld :: Float -> World -> World
 updateWorld seconds world = if (collision world) then world else
     let
         -- Clamp the ball's x and y coordinates within the boundaries of the
         -- the window.
-        locationB = locB $ ball world
+        locationB = loc $ ball world
         xB
             | fst locationB <= leftBoundary = leftBoundary
             | fst locationB >= rightBoundary = rightBoundary
@@ -209,7 +210,7 @@ updateWorld seconds world = if (collision world) then world else
             | otherwise = snd locationB
 
         -- Calculate the strength and direction of the new velocity.
-        vB = ((velB $ ball world) .+ impulse) .* retention where
+        vB = ((vel $ ball world) .+ impulse) .* retention where
             impulse = (horizontal, vertical) where
                 horizontal = case keys world of
                     Keys _ _ True False -> -effect
@@ -234,12 +235,12 @@ updateWorld seconds world = if (collision world) then world else
         -- to move away from the ball but stays in the window. The obstacle
         -- constantly accelerates downwards, making the game more difficult
         -- the longer you play. 
-        vO = (velO $ obst world) .+ (horizontal, -0.001) where
-            xO = fst $ locO $ obst world
-            xB = fst $ locB $ ball world
+        newVelO = (vel $ obst world) .+ (horizontal, -0.001) where
+            xO = fst $ loc $ obst world
+            xB = fst $ loc $ ball world
             horizontal 
-                | xO < leftBoundary + 3 * ballSize = 0.05
-                | xO > rightBoundary - 3 * ballSize = -0.05
+                | xO < leftBoundary + 3 * ballRadius = 0.05
+                | xO > rightBoundary - 3 * ballRadius = -0.05
                 | xO < xB = -0.01 
                 | otherwise = 0.01
 
@@ -247,13 +248,13 @@ updateWorld seconds world = if (collision world) then world else
         -- its velocity. If the obstacle moves past the window's bottom,
         -- move it above the window's top.
         newLocO 
-            | snd (locO $ obst world) <= bottomBoundary - ballSize * 2 =
-                (0, topBoundary + ballSize * 2)
-            | otherwise = (locO $ obst world) .+ vO
+            | snd (loc $ obst world) <= bottomBoundary - ballRadius * 2 =
+                (0, topBoundary + ballRadius * 2)
+            | otherwise = (loc $ obst world) .+ newVelO
 
     in World 
-        (Ball newLocB newVelB) 
-        (Obstacle newLocO vO)
+        (Mover newLocB newVelB) 
+        (Mover newLocO newVelO)
         (keys world)
 
 
@@ -294,10 +295,10 @@ windowLocation = (10,10)
 
 
 -- The boundaries of ball movement.
-leftBoundary = -0.5 * fromIntegral (fst windowSize) + ballSize
-rightBoundary = 0.5 * fromIntegral (fst windowSize) - ballSize
-topBoundary = 0.5 * fromIntegral (snd windowSize) - ballSize
-bottomBoundary = -0.5 * fromIntegral (snd windowSize) + ballSize
+leftBoundary = -0.5 * fromIntegral (fst windowSize) + ballRadius
+rightBoundary = 0.5 * fromIntegral (fst windowSize) - ballRadius
+topBoundary = 0.5 * fromIntegral (snd windowSize) - ballRadius
+bottomBoundary = -0.5 * fromIntegral (snd windowSize) + ballRadius
 
 
 -- The entry point of the program.
