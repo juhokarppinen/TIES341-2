@@ -92,21 +92,21 @@ ballSize = 25
 
 
 -- The picture of the ball.
-ballPic :: Picture
-ballPic = circleSolid ballSize
+ballPic' :: Picture
+ballPic' = circleSolid ballSize
 
 
 -- The initial state of the world.
 initialState :: World
 initialState = World 
     (Ball (0,0) (0,0) ballSize) 
-    (Obstacle (0,320) (0,-1))
+    (Obstacle (0,100) (0,0))
     noKey
 
 
 -- Render the world.
 render :: World -> Picture
-render world = if not (collision world) then
+render world =
     let
         holeSize = 2 * ballSize
         obstWidth = fromIntegral windowWidth
@@ -118,30 +118,39 @@ render world = if not (collision world) then
     in
         pictures
             [
-                uncurry translate ballLoc ballPic,
                 uncurry translate obstLeft obstPict,
-                uncurry translate obstRight obstPict
-            ]
-    else ballPic
+                uncurry translate obstRight obstPict,
+                uncurry translate ballLoc ballPic
+            ] where
+            ballPic
+                | collision world = color red (circleSolid ballSize)
+                | otherwise = circleSolid ballSize
 
 
--- Check whether the ball collides with an obstacle.
+-- Check whether the ball collides with an obstacle. Current implementation
+-- doesn't allow pixel perfect collision detection. Collisions are
+-- calculated using the rectangle surrounding the ball.
 collision :: World -> Bool
 collision world =
     let
-        holeSize = 2 * ballSize
         locationBall = locB $ ball world
         locationObst = locO $ obst world
         xB = fst locationBall
         yB = snd locationBall
         xO = fst locationObst
         yO = snd locationObst
-        holeLeft = fst locationObst - holeSize
-        holeRight = fst locationObst + holeSize
+        holeLeft = xO - 2 * ballSize
+        holeRight = xO + 2 * ballSize
+        obstTop = yO + ballSize
+        obstBottom = yO - ballSize
+        ballTop = yB + ballSize
+        ballBottom = yB - ballSize
+        ballLeft = xB - ballSize
+        ballRight = xB + ballSize
         ballIsAtObstHeight =
-            yB - ballSize <= yO + ballSize || yB + ballSize >= yO - ballSize 
+            ballTop >= obstBottom && ballBottom <= obstTop
         ballIsAtHole = 
-            xB - ballSize >= holeLeft && xB + ballSize <= holeRight
+            ballLeft >= holeLeft && ballRight <= holeRight
     in
         ballIsAtObstHeight && not ballIsAtHole
 
