@@ -100,7 +100,7 @@ ballPic' = circleSolid ballSize
 initialState :: World
 initialState = World 
     (Ball (0,0) (0,0) ballSize) 
-    (Obstacle (0,100) (0,0))
+    (Obstacle (0,400) (0,-1))
     noKey
 
 
@@ -244,9 +244,13 @@ updateWorld seconds world =
 
         vO = velO $ obst world
 
-        -- Set the obstacles location based on its previous loation and
-        -- its velocity.
-        newLocO = (locO $ obst world) .+ vO
+        -- Set the obstacle's location based on its previous location and
+        -- its velocity. If the obstacle moves past the window's bottom,
+        -- move it above the window's top.
+        newLocO 
+            | snd (locO $ obst world) <= bottomBoundary - ballSize * 2 =
+                (0, topBoundary + ballSize * 2)
+            | otherwise = (locO $ obst world) .+ vO
 
     in World 
         (Ball newLocB newVelB ballSize) 
