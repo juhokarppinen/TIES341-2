@@ -1,9 +1,10 @@
 {-
-    Ball Bouncer
+    Move-the-ball-avoid-the-wall
 
     By Juho Karppinen 2017
 
-    A simple game of avoidance.
+    A simple game of avoidance. Use arrow keys to move the ball around. Try
+    to avoid the falling wall. Hit ESC to quit.
 
 
     Non-base dependencies:
@@ -17,8 +18,8 @@ import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Game
 
 
--- Data type contains the ball's location and velocity and the state
--- of the keyboard.
+-- The data type which contains the state of the ball, the obstacle and the
+-- keyboard.
 data World = World
     {
         ball :: Ball,
@@ -41,8 +42,7 @@ data KeyboardState = Keys
 data Ball = Ball 
     {
         locB :: Point,
-        velB :: Vector,
-        radB :: Float
+        velB :: Vector
     } deriving Show
 
 
@@ -71,12 +71,7 @@ noKey :: KeyboardState
 noKey = Keys False False False False
 
 
--- The amount of gravity imparted to the ball.
-gravity :: Vector
-gravity = (0, 0)
-
-
--- The amount of movement retention. 1 = full retention. 0 = no retention.
+-- The amount of ball movement retention. 1 = full retention. 0 = no retention.
 retention :: Float
 retention = 0.95
 
@@ -91,15 +86,10 @@ ballSize :: Float
 ballSize = 25
 
 
--- The picture of the ball.
-ballPic' :: Picture
-ballPic' = circleSolid ballSize
-
-
 -- The initial state of the world.
 initialState :: World
 initialState = World 
-    (Ball (0,0) (0,0) ballSize) 
+    (Ball (0,0) (0,0)) 
     (Obstacle (0,topBoundary + ballSize) (0,-1))
     noKey
 
@@ -162,8 +152,7 @@ handleInput event world =
     World 
         (Ball 
             (locB . ball $ world) 
-            (velB . ball $ world) 
-            ballSize) 
+            (velB . ball $ world))
         (obst world)
         keystate where
     keystate = case event of
@@ -203,9 +192,9 @@ negateKey :: KeyboardState -> KeyboardState
 negateKey (Keys a b c d) = Keys (not a) (not b) (not c) (not d)
 
 
--- Handle object movement.
+-- Handle object movement. Collision stops updating the game.
 updateWorld :: Float -> World -> World
-updateWorld seconds world = 
+updateWorld seconds world = if (collision world) then world else
     let
         -- Clamp the ball's x and y coordinates within the boundaries of the
         -- the window.
@@ -220,7 +209,7 @@ updateWorld seconds world =
             | otherwise = snd locationB
 
         -- Calculate the strength and direction of the new velocity.
-        vB = ((velB $ ball world) .+ gravity .+ impulse) .* retention where
+        vB = ((velB $ ball world) .+ impulse) .* retention where
             impulse = (horizontal, vertical) where
                 horizontal = case keys world of
                     Keys _ _ True False -> -effect
@@ -263,7 +252,7 @@ updateWorld seconds world =
             | otherwise = (locO $ obst world) .+ vO
 
     in World 
-        (Ball newLocB newVelB ballSize) 
+        (Ball newLocB newVelB) 
         (Obstacle newLocO vO)
         (keys world)
 
