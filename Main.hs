@@ -100,7 +100,7 @@ ballPic' = circleSolid ballSize
 initialState :: World
 initialState = World 
     (Ball (0,0) (0,0) ballSize) 
-    (Obstacle (0,400) (0,-1))
+    (Obstacle (0,topBoundary + ballSize) (0,-1))
     noKey
 
 
@@ -241,8 +241,18 @@ updateWorld seconds world =
         -- its new velocity.    
         newLocB = (xB, yB) .+ newVelB
 
-
-        vO = velO $ obst world
+        -- Set the obstacle's horizontal velocity such that the hole tends
+        -- to move away from the ball but stays in the window. The obstacle
+        -- constantly accelerates downwards, making the game more difficult
+        -- the longer you play. 
+        vO = (velO $ obst world) .+ (horizontal, -0.001) where
+            xO = fst $ locO $ obst world
+            xB = fst $ locB $ ball world
+            horizontal 
+                | xO < leftBoundary + 3 * ballSize = 0.05
+                | xO > rightBoundary - 3 * ballSize = -0.05
+                | xO < xB = -0.01 
+                | otherwise = 0.01
 
         -- Set the obstacle's location based on its previous location and
         -- its velocity. If the obstacle moves past the window's bottom,
